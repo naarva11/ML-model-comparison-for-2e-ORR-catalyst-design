@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this repository, please cite it using the metadata below."
+title: "KOH 2e-ORR selectivity modeling code and processed dataset"
+version: 1.0.0
+date-released: 2026-03-29
+type: software
+authors:
+  - family-names: "REPLACE_WITH_SURNAME"
+    given-names: "REPLACE_WITH_GIVEN_NAME"
+repository-code: "https://github.com/REPLACE_WITH_USERNAME/REPLACE_WITH_REPOSITORY"
+license: "Apache-2.0"
+keywords:
+  - "hydrogen peroxide"
+  - "2e-ORR"
+  - "machine learning"
+  - "XGBoost"
+  - "alkaline media"
+abstract: >
+  Code and processed dataset for machine-learning analysis of H2O2 selectivity
+  in alkaline 2e-ORR, including the main benchmarking workflow and the
+  synthetic-data learning-curve experiment.
