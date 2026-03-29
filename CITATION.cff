@@ -5,8 +5,19 @@ version: 1.0.0
 date-released: 2026-03-29
 type: software
 authors:
-  - family-names: "REPLACE_WITH_SURNAME"
-    given-names: "REPLACE_WITH_GIVEN_NAME"
+  - family-names: Kataria
+    given-names: Yash V.
+  - family-names: Rozhkov
+    given-names: Yaroslav D.
+  - family-names: Tokarev
+    given-names: Denis V.
+  - family-names: Ulyankina
+    given-names: Anna A.
+  - family-names: Kashparova
+    given-names: Vera P.
+  - family-names: Smirnova
+    given-names: Nina V.
+
 repository-code: "https://github.com/REPLACE_WITH_USERNAME/REPLACE_WITH_REPOSITORY"
 license: "Apache-2.0"
 keywords:
@@ -14,7 +25,6 @@ keywords:
   - "2e-ORR"
   - "machine learning"
   - "XGBoost"
-  - "alkaline media"
 abstract: >
   Code and processed dataset for machine-learning analysis of H2O2 selectivity
   in alkaline 2e-ORR, including the main benchmarking workflow and the
