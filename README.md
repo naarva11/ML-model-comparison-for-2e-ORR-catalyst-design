@@ -78,14 +78,6 @@ Outputs are written to:
 - baseline and synthetic-pretraining comparison tables
 - R2 / RMSE / MAE learning-curve figures
 
-## Citation
-
-Before publication, update `CITATION.cff` with:
-- final author names
-- manuscript / repository title
-- repository URL
-- release DOI, if you archive the release in Zenodo
-
 ## License
 
 The source code in this repository is released under the **Apache License 2.0**. See `LICENSE`.
