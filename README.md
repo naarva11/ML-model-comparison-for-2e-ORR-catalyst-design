@@ -37,10 +37,6 @@ The main modeling sheet used by the code is:
 
 - `modeling_data`
 
-In the current processed workbook:
-- rows **1–9** are labeled `Original experiment`
-- rows **after 9** are labeled `Literature`
-
 ## Reproducing the main results
 
 Run the main modeling pipeline:
