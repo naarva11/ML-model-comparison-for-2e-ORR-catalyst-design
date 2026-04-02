@@ -6,7 +6,7 @@ This repository contains the code and processed dataset used to reproduce the ma
 
 - `main_model.py` — main modeling workflow, cross-validation benchmarking, feature importance, validation-curve plotting, and output table export.
 - `learning_curve.py` — synthetic-data pretraining / learning-curve experiment.
-- `koh_2eorr_cleaned_variant_for_modeling.xlsx` — processed dataset workbook used by the scripts.
+- `modeling_data.xlsx` — processed dataset workbook used by the scripts.
 - `DATA_DICTIONARY.md` — description of workbook sheets and columns.
 - `requirements.txt` — installation requirements.
 - `requirements-lock-reference.txt` — reference package versions recorded for this release package.
@@ -31,11 +31,11 @@ pip install -r requirements.txt
 
 Both scripts look for the dataset file in the same directory as the Python scripts:
 
-- `koh_2eorr_cleaned_variant_for_modeling.xlsx`
+- `modeling_data.xlsx`
 
 The main modeling sheet used by the code is:
 
-- `cleaned_modeling_data`
+- `modeling_data`
 
 In the current processed workbook:
 - rows **1–9** are labeled `Original experiment`
@@ -51,7 +51,7 @@ python main_model.py
 
 Outputs are written to:
 
-- `results_xgb_cleaned_main/`
+- `main_results/`
 
 Run the learning-curve experiment:
 
@@ -61,7 +61,7 @@ python learning_curve.py
 
 Outputs are written to:
 
-- `results_learning_curve_xgb/`
+- `learning_results/`
 
 ## Expected generated outputs
 
