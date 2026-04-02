@@ -7,7 +7,6 @@ This repository contains the code and processed dataset used to reproduce the ma
 - `main_model.py` — main modeling workflow, cross-validation benchmarking, feature importance, validation-curve plotting, and output table export.
 - `learning_curve.py` — synthetic-data pretraining / learning-curve experiment.
 - `modeling_data.xlsx` — processed dataset workbook used by the scripts.
-- `DATA_DICTIONARY.md` — description of workbook sheets and columns.
 - `requirements.txt` — installation requirements.
 - `requirements-lock-reference.txt` — reference package versions recorded for this release package.
 - `LICENSE` — Apache-2.0 license for the source code in this repository.
