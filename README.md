@@ -1,6 +1,6 @@
 # KOH 2e-ORR Selectivity Modeling
 
-This repository contains the code and processed dataset used to reproduce the machine-learning analyses for the associated manuscript on H$_2$O$_2$ selectivity modeling in alkaline 2e-ORR.
+This repository contains the code and processed dataset used to reproduce the machine-learning analyses for the associated manuscript on H_2O_2 selectivity modeling in alkaline 2e-ORR.
 
 ## Repository contents
 
