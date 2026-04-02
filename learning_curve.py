@@ -26,21 +26,21 @@ warnings.filterwarnings("ignore")
 
 RANDOM_STATE = 42
 N_SPLITS = 5
-PROTECTED_FIRST_N = 9
-MODEL_EXPERIMENTAL_FIRST_N = 31
 
 SYNTHETIC_SIZES = [100, 500, 1000, 5000, 10000]
 
 NUM_COLS = ["ID/IG", "Time", "Temperature , C", "BET, m2/g"]
-CAT_COLS = ["Model Dataset source"]
+CAT_COLS = ["Dataset source"]
 TARGET_COL = "H2O2 (%)"
+
+LEGACY_SOURCE_BOUNDARY = 30
 
 try:
     BASE_DIR = Path(__file__).resolve().parent
 except NameError:
     BASE_DIR = Path.cwd()
 
-OUT_DIR = BASE_DIR / "results_learning_curve_xgb"
+OUT_DIR = BASE_DIR / "learning_results"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -57,50 +57,63 @@ def make_onehot():
 
 def find_data_file() -> Path:
     candidates = [
-        BASE_DIR / "koh_2eorr_cleaned_variant_for_modeling.xlsx",
-        BASE_DIR / "koh_2eorr_cleaned_modeling_data.csv",
+        BASE_DIR / "modeling_data.xlsx"
     ]
     for path in candidates:
         if path.exists():
             return path
-    raise FileNotFoundError
+    raise FileNotFoundError("Could not find dataset file.")
 
 
-def get_model_dataset_source(df: pd.DataFrame) -> pd.Series:
-    return pd.Series(
-        np.where(
-            df["Original row id"] <= MODEL_EXPERIMENTAL_FIRST_N,
-            "Original experiment",
-            "Literature",
-        ),
-        index=df.index,
-        name=CAT_COLS[0],
+def restore_legacy_learning_source(df: pd.DataFrame) -> pd.DataFrame:
+    if "Dataset source" not in df.columns:
+        df["Dataset source"] = "Unknown"
+
+    if "Original row id" not in df.columns:
+        return df
+
+    counts = df["Dataset source"].astype(str).value_counts(dropna=False).to_dict()
+    is_current_visible_split = (
+        len(df) == 48
+        and counts.get("Original experiment", 0) == 9
+        and counts.get("Literature", 0) == 39
     )
+
+    if is_current_visible_split:
+        df = df.copy()
+        row_id = pd.to_numeric(df["Original row id"], errors="coerce").fillna(-1).astype(int)
+        df["Dataset source"] = np.where(
+            row_id <= LEGACY_SOURCE_BOUNDARY,
+            "Original experiment",
+            "Literature KOH",
+        )
+    return df
 
 
 def load_dataset() -> pd.DataFrame:
     path = find_data_file()
 
     if path.suffix.lower() == ".xlsx":
-        df = pd.read_excel(path, sheet_name="cleaned_modeling_data")
+        xls = pd.ExcelFile(path)
+        if "modeling_data" in xls.sheet_names:
+            df = pd.read_excel(path, sheet_name="modeling_data")
+        elif "cleaned_modeling_data" in xls.sheet_names:
+            df = pd.read_excel(path, sheet_name="cleaned_modeling_data")
+        else:
+            raise KeyError("Could not find 'modeling_data' sheet.")
     else:
         df = pd.read_csv(path)
 
     required = NUM_COLS + [TARGET_COL]
     missing = [c for c in required if c not in df.columns]
     if missing:
-        raise KeyError
+        raise KeyError(f"Missing required columns: {missing}")
 
     for col in NUM_COLS + [TARGET_COL]:
         df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    if "Original row id" not in df.columns:
-        df.insert(0, "Original row id", np.arange(1, len(df) + 1))
-
-    if "Dataset source" not in df.columns:
-        df["Dataset source"] = "Unknown"
-
     df = df.dropna(subset=NUM_COLS + [TARGET_COL]).reset_index(drop=True)
+    df = restore_legacy_learning_source(df)
     return df
 
 
@@ -151,15 +164,10 @@ def generate_synthetic_points_local(
     n_synth: int,
     random_state: int,
 ) -> pd.DataFrame:
-    """
-    Generates local synthetic points from real train-fold only.
-    Numeric features are interpolated between nearest neighbors.
-    Dataset source is preserved from sampled source groups.
-    """
     rng = np.random.default_rng(random_state)
     synth_rows = []
 
-    source_values = X_train_df[CAT_COLS[0]].astype(str).to_numpy()
+    source_values = X_train_df["Dataset source"].astype(str).to_numpy()
     unique_sources, source_counts = np.unique(source_values, return_counts=True)
     source_probs = source_counts / source_counts.sum()
 
@@ -168,7 +176,7 @@ def generate_synthetic_points_local(
 
     for _ in range(n_synth):
         src = rng.choice(unique_sources, p=source_probs)
-        sub = X_train_df[X_train_df[CAT_COLS[0]].astype(str) == src].copy()
+        sub = X_train_df[X_train_df["Dataset source"].astype(str) == src].copy()
 
         if len(sub) < 2:
             sub = X_train_df.copy()
@@ -202,10 +210,6 @@ def fit_gpr_teacher(
     X_train_df: pd.DataFrame,
     y_train: np.ndarray,
 ):
-    """
-    GPR teacher only on numeric features.
-    Used only to label synthetic points.
-    """
     X_num = X_train_df[NUM_COLS].to_numpy(dtype=float)
 
     scaler = StandardScaler()
@@ -306,8 +310,7 @@ def run_learning_curve_experiment(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Da
     - synthetic experiment: XGB pretrained on synthetic (GPR-labeled), then finetuned on real
     - evaluation always on real held-out folds
     """
-    X = df[NUM_COLS].copy().reset_index(drop=True)
-    X[CAT_COLS[0]] = get_model_dataset_source(df).reset_index(drop=True)
+    X = df[NUM_COLS + CAT_COLS].reset_index(drop=True)
     y = df[TARGET_COL].to_numpy(dtype=float)
 
     cv = KFold(n_splits=N_SPLITS, shuffle=True, random_state=RANDOM_STATE)

@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import warnings
@@ -30,15 +31,13 @@ try:
 except NameError:
     BASE_DIR = Path.cwd()
 
-OUT_DIR = BASE_DIR / "results_xgb_cleaned_main"
+OUT_DIR = BASE_DIR / "main_results"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 NUM_COLS = ["ID/IG", "Time", "Temperature , C", "BET, m2/g"]
-CAT_COLS = ["Model Dataset source"]
 TARGET_COL = "H2O2 (%)"
-
 PROTECTED_FIRST_N = 9
-MODEL_EXPERIMENTAL_FIRST_N = 31
+BENCHMARK_SOURCE_COUNT = 30
 
 
 def rmse(y_true, y_pred):
@@ -54,39 +53,29 @@ def make_onehot():
 
 def find_data_file() -> Path:
     candidates = [
-        BASE_DIR / "koh_2eorr_cleaned_variant_for_modeling.xlsx",
-        BASE_DIR / "koh_2eorr_cleaned_modeling_data.csv",
+        BASE_DIR / "modeling_data.xlsx"
     ]
     for path in candidates:
         if path.exists():
             return path
-    raise FileNotFoundError
-
-
-def get_model_dataset_source(df: pd.DataFrame) -> pd.Series:
-    return pd.Series(
-        np.where(
-            df["Original row id"] <= MODEL_EXPERIMENTAL_FIRST_N,
-            "Original experiment",
-            "Literature",
-        ),
-        index=df.index,
-        name=CAT_COLS[0],
-    )
+    raise FileNotFoundError("Could not find the modeling dataset next to the script.")
 
 
 def load_dataset() -> pd.DataFrame:
     path = find_data_file()
 
     if path.suffix.lower() == ".xlsx":
-        df = pd.read_excel(path, sheet_name="cleaned_modeling_data")
+        xls = pd.ExcelFile(path)
+        preferred_sheets = ["modeling_data"]
+        sheet_name = next((s for s in preferred_sheets if s in xls.sheet_names), xls.sheet_names[0])
+        df = pd.read_excel(path, sheet_name=sheet_name)
     else:
         df = pd.read_csv(path)
 
-    required = NUM_COLS + ["Dataset source"] + [TARGET_COL]
+    required = NUM_COLS + [TARGET_COL]
     missing = [c for c in required if c not in df.columns]
     if missing:
-        raise KeyError
+        raise KeyError(f"Missing required columns: {missing}")
 
     for c in NUM_COLS + [TARGET_COL]:
         df[c] = pd.to_numeric(df[c], errors="coerce")
@@ -105,6 +94,21 @@ def load_dataset() -> pd.DataFrame:
     return df
 
 
+def benchmark_source_from_row_order(df: pd.DataFrame) -> pd.Series:
+    """Frozen benchmark split used in the original cleaned-modeling benchmark."""
+    return np.where(
+        np.arange(len(df)) < BENCHMARK_SOURCE_COUNT,
+        "Original experiment",
+        "Literature",
+    )
+
+
+def make_feature_frame(df: pd.DataFrame) -> pd.DataFrame:
+    X = df[NUM_COLS].copy()
+    X["Benchmark source"] = benchmark_source_from_row_order(df)
+    return X
+
+
 def build_preprocessor() -> ColumnTransformer:
     return ColumnTransformer(
         transformers=[
@@ -121,7 +125,7 @@ def build_preprocessor() -> ColumnTransformer:
                     ("imputer", SimpleImputer(strategy="most_frequent")),
                     ("onehot", make_onehot()),
                 ]),
-                CAT_COLS,
+                ["Benchmark source"],
             ),
         ]
     )
@@ -181,8 +185,7 @@ def shorten_label(text: str, max_len: int = 16) -> str:
 
 
 def evaluate_models_cv(df: pd.DataFrame) -> tuple[pd.DataFrame, dict[str, np.ndarray]]:
-    X = df[NUM_COLS].copy()
-    X[CAT_COLS[0]] = get_model_dataset_source(df)
+    X = make_feature_frame(df)
     y = df[TARGET_COL].to_numpy(dtype=float)
     cv = KFold(n_splits=N_SPLITS, shuffle=True, random_state=RANDOM_STATE)
 
@@ -302,8 +305,7 @@ def plot_grouped_metrics_bar_chart(summary_df: pd.DataFrame) -> None:
 
 
 def permutation_importance_numeric_only(df: pd.DataFrame) -> pd.DataFrame:
-    X = df[NUM_COLS].copy().reset_index(drop=True)
-    X[CAT_COLS[0]] = get_model_dataset_source(df).reset_index(drop=True)
+    X = make_feature_frame(df).reset_index(drop=True)
     y = df[TARGET_COL].to_numpy(dtype=float)
     cv = KFold(n_splits=N_SPLITS, shuffle=True, random_state=RANDOM_STATE)
 
@@ -337,8 +339,17 @@ def permutation_importance_numeric_only(df: pd.DataFrame) -> pd.DataFrame:
 
     imp_df = pd.DataFrame({
         "Feature": NUM_COLS,
-        "Importance": [np.mean(feature_scores[f]) for f in NUM_COLS]
-    }).sort_values("Importance", ascending=False).reset_index(drop=True)
+        "RawImportance": [np.mean(feature_scores[f]) for f in NUM_COLS]
+    })
+
+    total_importance = imp_df["RawImportance"].sum()
+    if total_importance > 0:
+        imp_df["Importance"] = imp_df["RawImportance"] / total_importance
+    else:
+        imp_df["Importance"] = 0.0
+
+    imp_df["ImportancePercent"] = 100.0 * imp_df["Importance"]
+    imp_df = imp_df.sort_values("Importance", ascending=False).reset_index(drop=True)
 
     return imp_df
 
@@ -346,23 +357,25 @@ def permutation_importance_numeric_only(df: pd.DataFrame) -> pd.DataFrame:
 def plot_feature_importance_article_style(imp_df: pd.DataFrame) -> None:
     fig, ax = plt.subplots(figsize=(7.2, 5.2))
 
+    plot_values = imp_df["Importance"].to_numpy()
     bars = ax.bar(
         range(len(imp_df)),
-        imp_df["Importance"].to_numpy(),
+        plot_values,
         color="#9BCB9B",
         edgecolor="white"
     )
 
     ax.set_xticks(range(len(imp_df)))
     ax.set_xticklabels(imp_df["Feature"], rotation=35, ha="right")
-    ax.set_ylabel("Feature importance")
-    ax.set_title("Feature importance")
+    ax.set_ylabel("Normalized feature importance")
+    ax.set_title("Feature importance (sum = 1)")
+    ax.set_ylim(0, max(plot_values) * 1.15 if len(plot_values) and max(plot_values) > 0 else 1)
 
-    for bar, value in zip(bars, imp_df["Importance"]):
+    for bar, value, pct in zip(bars, imp_df["Importance"], imp_df["ImportancePercent"]):
         ax.text(
             bar.get_x() + bar.get_width() / 2,
             value,
-            f"{value:.3f}",
+            f"{value:.3f}\n({pct:.1f}%)",
             ha="center",
             va="bottom",
             fontsize=10,
@@ -406,7 +419,7 @@ def plot_validation_curve_showcase(df: pd.DataFrame, oof_pred_xgb: np.ndarray) -
 
     pet9 = choose_best_pet_point(work)
 
-    literature_mask = get_model_dataset_source(work).astype(str).str.contains("Literature", case=False, na=False)
+    literature_mask = work["Dataset source"].astype(str).str.contains("Literature", case=False, na=False)
     literature = work[literature_mask].copy()
 
     best_four = literature.sort_values("AbsError", ascending=True).head(4).copy().reset_index(drop=True)
