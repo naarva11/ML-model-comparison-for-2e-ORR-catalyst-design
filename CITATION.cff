@@ -17,6 +17,8 @@ authors:
     given-names: Vera P.
   - family-names: Smirnova
     given-names: Nina V.
+  - family-names: Larina
+    given-names: Varvara D.
 
 repository-code: "https://github.com/REPLACE_WITH_USERNAME/REPLACE_WITH_REPOSITORY"
 license: "Apache-2.0"
